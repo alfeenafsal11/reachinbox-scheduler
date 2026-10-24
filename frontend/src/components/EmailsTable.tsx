@@ -17,7 +17,8 @@ function formatDate(iso: string | null): string {
   }).format(d);
 }
 
-const GRID = '1.2fr 1.6fr 1.2fr 1.1fr 120px';
+// Fixed-fraction grid layout with guaranteed minimum widths per column
+const GRID_TEMPLATE = 'minmax(180px, 1.2fr) minmax(220px, 1.6fr) minmax(170px, 1.1fr) minmax(150px, 1fr) 110px';
 
 export function EmailsTable({
   mode,
@@ -147,193 +148,211 @@ export function EmailsTable({
         </div>
       )}
 
-      {/* Table Column Headers */}
-      <div
-        className="table-row"
-        style={{
-          gridTemplateColumns: GRID,
-          background: 'rgba(17, 21, 36, 0.7)',
-          borderBottom: '1px solid var(--border-subtle)',
-          fontWeight: 700,
-          fontSize: '0.74rem',
-          color: 'var(--text-muted)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-          userSelect: 'none',
-        }}
-      >
-        <span>Recipient</span>
-        <span>Subject</span>
-        <span>Sender Mailbox</span>
-        <span>{mode === 'sent' ? 'Delivered At' : 'Target Schedule'}</span>
-        <span style={{ textAlign: 'right' }}>Status</span>
-      </div>
-
-      {/* Table Body */}
-      {loading ? (
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="skeleton" style={{ height: 48, width: '100%' }} />
-          ))}
-        </div>
-      ) : !data || data.items.length === 0 ? (
-        <div style={{ padding: '72px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+      {/* Horizontal Scroll Wrapper to prevent overlapping on any screen size */}
+      <div style={{ overflowX: 'auto', width: '100%' }}>
+        <div style={{ minWidth: 880 }}>
+          {/* Table Column Headers */}
           <div
+            className="table-row"
             style={{
-              width: 56,
-              height: 56,
-              borderRadius: 16,
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid var(--border-subtle)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 16,
+              display: 'grid',
+              gridTemplateColumns: GRID_TEMPLATE,
+              gap: 16,
+              background: 'rgba(17, 21, 36, 0.75)',
+              borderBottom: '1px solid var(--border-subtle)',
+              fontWeight: 700,
+              fontSize: '0.74rem',
               color: 'var(--text-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              userSelect: 'none',
+              padding: '14px 24px',
             }}
           >
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect width="20" height="16" x="2" y="4" rx="2" />
-              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-            </svg>
+            <span style={{ minWidth: 0 }}>Recipient</span>
+            <span style={{ minWidth: 0 }}>Subject</span>
+            <span style={{ minWidth: 0 }}>Sender Mailbox</span>
+            <span style={{ minWidth: 0 }}>{mode === 'sent' ? 'Delivered At' : 'Target Schedule'}</span>
+            <span style={{ minWidth: 0, textAlign: 'right' }}>Status</span>
           </div>
-          <h3 style={{ margin: '0 0 6px', fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-            {mode === 'search' ? 'No emails match your query' : 'No campaign emails found'}
-          </h3>
-          <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: 360, marginInline: 'auto' }}>
-            {mode === 'search'
-              ? 'Try adjusting your search terms or clearing the status filter.'
-              : 'Click "+ Schedule Campaign" above to enqueue delayed email batches.'}
-          </p>
-        </div>
-      ) : (
-        <div>
-          {data.items.map((email) => (
-            <div
-              key={email.id}
-              className="table-row"
-              style={{
-                gridTemplateColumns: GRID,
-                gap: 16,
-                padding: '16px 24px',
-              }}
-            >
-              {/* Recipient */}
+
+          {/* Table Body */}
+          {loading ? (
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="skeleton" style={{ height: 48, width: '100%' }} />
+              ))}
+            </div>
+          ) : !data || data.items.length === 0 ? (
+            <div style={{ padding: '72px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
               <div
                 style={{
-                  display: 'flex',
+                  width: 56,
+                  height: 56,
+                  borderRadius: 16,
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid var(--border-subtle)',
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 8,
-                  overflow: 'hidden',
-                  cursor: 'pointer',
+                  justifyContent: 'center',
+                  marginBottom: 16,
+                  color: 'var(--text-muted)',
                 }}
-                onClick={() => copyEmail(email.toEmail, email.id)}
-                title="Click to copy email address"
               >
-                <div
-                  style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: 6,
-                    background: 'rgba(139, 92, 246, 0.1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#a78bfa',
-                    flexShrink: 0,
-                    fontSize: '0.75rem',
-                  }}
-                >
-                  @
-                </div>
-                <span
-                  className="font-mono"
-                  style={{
-                    fontSize: '0.825rem',
-                    color: 'var(--text-primary)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    fontWeight: 500,
-                  }}
-                >
-                  {email.toEmail}
-                </span>
-                {copiedId === email.id && (
-                  <span style={{ fontSize: '0.7rem', color: '#34d399', fontWeight: 600 }}>Copied!</span>
-                )}
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="20" height="16" x="2" y="4" rx="2" />
+                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                </svg>
               </div>
-
-              {/* Subject */}
-              <div style={{ overflow: 'hidden' }}>
+              <h3 style={{ margin: '0 0 6px', fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                {mode === 'search' ? 'No emails match your query' : 'No campaign emails found'}
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: 360, marginInline: 'auto' }}>
+                {mode === 'search'
+                  ? 'Try adjusting your search terms or clearing the status filter.'
+                  : 'Click "+ Schedule Campaign" above to enqueue delayed email batches.'}
+              </p>
+            </div>
+          ) : (
+            <div>
+              {data.items.map((email) => (
                 <div
+                  key={email.id}
+                  className="table-row"
                   style={{
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: 'var(--text-primary)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
+                    display: 'grid',
+                    gridTemplateColumns: GRID_TEMPLATE,
+                    gap: 16,
+                    padding: '16px 24px',
+                    alignItems: 'center',
                   }}
-                  title={email.subject}
                 >
-                  {email.subject}
-                </div>
-                {email.body && (
+                  {/* Recipient Column */}
                   <div
                     style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--text-muted)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      minWidth: 0,
                       overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      marginTop: 2,
+                      cursor: 'pointer',
                     }}
+                    onClick={() => copyEmail(email.toEmail, email.id)}
+                    title="Click to copy email address"
                   >
-                    {email.body.slice(0, 60)}
+                    <div
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: 6,
+                        background: 'rgba(139, 92, 246, 0.12)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#a78bfa',
+                        flexShrink: 0,
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                      }}
+                    >
+                      @
+                    </div>
+                    <span
+                      className="font-mono"
+                      style={{
+                        fontSize: '0.825rem',
+                        color: 'var(--text-primary)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        fontWeight: 500,
+                        minWidth: 0,
+                      }}
+                    >
+                      {email.toEmail}
+                    </span>
+                    {copiedId === email.id && (
+                      <span style={{ fontSize: '0.7rem', color: '#34d399', fontWeight: 600, flexShrink: 0 }}>
+                        Copied!
+                      </span>
+                    )}
                   </div>
-                )}
-              </div>
 
-              {/* Sender */}
-              <div style={{ overflow: 'hidden' }}>
-                <span
-                  style={{
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    display: 'block',
-                  }}
-                  title={email.sender?.email ?? 'Unknown Sender'}
-                >
-                  {email.sender?.email ?? '—'}
-                </span>
-              </div>
+                  {/* Subject Column */}
+                  <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title={email.subject}
+                    >
+                      {email.subject}
+                    </div>
+                    {email.body && (
+                      <div
+                        style={{
+                          fontSize: '0.75rem',
+                          color: 'var(--text-muted)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          marginTop: 2,
+                        }}
+                      >
+                        {email.body.slice(0, 60)}
+                      </div>
+                    )}
+                  </div>
 
-              {/* Date */}
-              <div>
-                <span
-                  style={{
-                    fontSize: '0.8rem',
-                    color: 'var(--text-muted)',
-                    fontVariantNumeric: 'tabular-nums',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {formatDate(mode === 'sent' ? email.sentAt : email.scheduledAt)}
-                </span>
-              </div>
+                  {/* Sender Column */}
+                  <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                    <span
+                      style={{
+                        fontSize: '0.8rem',
+                        color: 'var(--text-secondary)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        display: 'block',
+                      }}
+                      title={email.sender?.email ?? 'Unknown Sender'}
+                    >
+                      {email.sender?.email ?? '—'}
+                    </span>
+                  </div>
 
-              {/* Status */}
-              <div style={{ textAlign: 'right', display: 'flex', justifyContent: 'flex-end' }}>
-                <StatusBadge status={email.status} />
-              </div>
+                  {/* Date Column */}
+                  <div style={{ minWidth: 0 }}>
+                    <span
+                      style={{
+                        fontSize: '0.8rem',
+                        color: 'var(--text-muted)',
+                        fontVariantNumeric: 'tabular-nums',
+                        whiteSpace: 'nowrap',
+                        display: 'block',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {formatDate(mode === 'sent' ? email.sentAt : email.scheduledAt)}
+                    </span>
+                  </div>
+
+                  {/* Status Column */}
+                  <div style={{ minWidth: 0, textAlign: 'right', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+                    <StatusBadge status={email.status} />
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      )}
+      </div>
 
       {/* Pagination Footer */}
       {data && data.total > PAGE_SIZE && (
