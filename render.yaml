@@ -1,9 +1,3 @@
-databases:
-  - name: reachinbox-db
-    databaseName: scheduler
-    user: scheduler_user
-    plan: free
-
 services:
   # 1. Managed Redis
   - type: redis
@@ -28,9 +22,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
-        fromDatabase:
-          name: reachinbox-db
-          property: connectionString
+        sync: false
       - key: REDIS_URL
         fromService:
           type: redis
