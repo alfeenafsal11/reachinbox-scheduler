@@ -93,31 +93,49 @@ Open **http://localhost:5173**
 
 This project ships with a **portable Redis** binary and uses **embedded-postgres**, so you can run everything natively on Windows with no external installs.
 
+> [!NOTE]
+> Run all commands starting from the project root directory (`PROJECT_ALF`).
+
 ```powershell
-# 1. Configure environment
+# 1. Configure environment (from project root)
 Copy-Item .env.example .env
-# Edit .env — see Configuration section below
+# Edit .env if needed (default values work with zero-install)
 
-# 2. Install all dependencies
-cd backend; npm install; cd ..
-cd frontend; npm install; cd ..
+# 2. Install dependencies
+cd backend
+npm install
+cd ../frontend
+npm install
+cd ..
 
-# 3. Start local infra (Redis + embedded Postgres)
-cd scripts
-npx tsx start-local-infra.ts
+# 3. Start local infra (Redis on :6379 + embedded Postgres on :5432)
+# Run from project root — will spawn background Redis & Postgres
+npx tsx scripts/start-local-infra.ts
 
-# 4. In a new terminal — run DB migrations
+# 4. Run DB migrations (from project root)
 cd backend
 npx prisma db push
+cd ..
 
-# 5. In separate terminals:
-npm run dev:api       # API on :4000
-npm run dev:worker    # Background email worker
+# 5. In separate terminal windows:
+# Terminal 1 — API Server:
+cd backend
+npm run dev:api       # API on http://localhost:4000
 
-# 6. Start the frontend
-cd ../frontend
-npm run dev           # Dashboard on :5173
+# Terminal 2 — Email Worker:
+cd backend
+npm run dev:worker    # Background BullMQ worker
+
+# Terminal 3 — Frontend:
+cd frontend
+npm run dev           # Dashboard on http://localhost:5173
 ```
+
+> [!TIP]
+> **Windows `EPERM` error on `npx prisma db push`?**
+> If you get `EPERM: operation not permitted, rename ... query_engine-windows.dll.node`, it means your backend server (`npm run dev:api`) is currently running and Windows has locked the native engine file.
+> - **Fix 1**: Stop `npm run dev:api` (press `Ctrl+C`), run `npx prisma db push`, then restart `npm run dev:api`.
+> - **Fix 2**: Or run `npx prisma db push --skip-generate` (the database schema syncs without needing to overwrite the locked client file).
 
 ---
 
