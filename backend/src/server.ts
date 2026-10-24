@@ -8,6 +8,7 @@ import { errorHandler } from './middleware/errorHandler';
 
 import { authRouter } from './modules/auth/auth.routes';
 import { emailsRouter } from './modules/emails/emails.routes';
+import { slackRouter } from './modules/slack/slack.routes';
 
 const app = express();
 
@@ -35,6 +36,9 @@ app.use('/auth', authRouter);
 
 // Emails API routes
 app.use('/api/emails', emailsRouter);
+
+// Slack API routes
+app.use('/api/slack', slackRouter);
 
 app.use(errorHandler);
 
