@@ -32,48 +32,95 @@ export function LoginPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'radial-gradient(ellipse at 30% 20%, rgba(139,92,246,0.12) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(59,130,246,0.08) 0%, transparent 60%), var(--bg-primary)',
-        padding: 16,
+        background:
+          'radial-gradient(circle at 50% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(56, 189, 248, 0.08) 0%, transparent 45%), var(--bg-primary)',
+        padding: 20,
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
-      {/* Decorative glow orbs */}
-      <div style={{ position: 'fixed', top: '15%', left: '10%', width: 300, height: 300, borderRadius: '50%', background: 'rgba(139,92,246,0.06)', filter: 'blur(80px)', pointerEvents: 'none' }} />
-      <div style={{ position: 'fixed', bottom: '10%', right: '8%', width: 250, height: 250, borderRadius: '50%', background: 'rgba(59,130,246,0.05)', filter: 'blur(70px)', pointerEvents: 'none' }} />
+      {/* Background Decorative Mesh Grids */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage:
+            'radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
+          opacity: 0.35,
+          pointerEvents: 'none',
+        }}
+      />
 
-      <div className="glass-card fade-in" style={{ width: '100%', maxWidth: 420, padding: 40 }}>
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 60, height: 60, borderRadius: 16, background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', marginBottom: 16, boxShadow: '0 8px 32px rgba(124,58,237,0.3)' }}>
-            <span style={{ fontSize: 28 }}>✉️</span>
+      <div
+        className="glass-card fade-in"
+        style={{
+          width: '100%',
+          maxWidth: 440,
+          padding: '44px 36px',
+          position: 'relative',
+          zIndex: 10,
+        }}
+      >
+        {/* Brand Header */}
+        <div style={{ textAlign: 'center', marginBottom: 36 }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 54,
+              height: 54,
+              borderRadius: 14,
+              background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+              marginBottom: 16,
+              boxShadow: '0 8px 24px rgba(124, 58, 237, 0.4)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+            }}
+          >
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect width="20" height="16" x="2" y="4" rx="2" />
+              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+            </svg>
           </div>
-          <h1 className="gradient-text" style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800 }}>
+
+          <h1
+            className="gradient-text"
+            style={{ margin: 0, fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.02em' }}
+          >
             ReachInbox
           </h1>
-          <p style={{ margin: '8px 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            Email Scheduler Dashboard
+          <p style={{ margin: '8px 0 0', color: 'var(--text-secondary)', fontSize: '0.925rem' }}>
+            Enterprise Email Scheduler & Dispatcher
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Login Form */}
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div>
-            <label style={labelStyle} htmlFor="login-name">Display Name</label>
+            <label style={labelStyle} htmlFor="login-name">
+              Display Name
+            </label>
             <input
               id="login-name"
               className="input-field"
               type="text"
-              placeholder="Your name"
+              placeholder="e.g. Alex Morgan"
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus
             />
           </div>
+
           <div>
-            <label style={labelStyle} htmlFor="login-email">Email Address</label>
+            <label style={labelStyle} htmlFor="login-email">
+              Work Email
+            </label>
             <input
               id="login-email"
               className="input-field"
               type="email"
-              placeholder="you@example.com"
+              placeholder="alex@reachinbox.ai"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -84,15 +131,54 @@ export function LoginPage() {
             type="submit"
             className="btn-primary"
             disabled={loading}
-            style={{ width: '100%', justifyContent: 'center', marginTop: 8, padding: '12px 20px', fontSize: '1rem' }}
+            style={{
+              width: '100%',
+              justifyContent: 'center',
+              marginTop: 6,
+              padding: '13px 20px',
+              fontSize: '0.95rem',
+            }}
           >
-            {loading ? 'Signing in…' : '→ Sign In (Dev Mode)'}
+            {loading ? (
+              'Authenticating…'
+            ) : (
+              <>
+                <span>Enter Dashboard</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
+              </>
+            )}
           </button>
         </form>
 
-        <p style={{ marginTop: 24, textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-          Development mode · No password required
-        </p>
+        {/* Security / Dev Note */}
+        <div
+          style={{
+            marginTop: 28,
+            padding: '12px 16px',
+            borderRadius: 10,
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid var(--border-subtle)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          <div
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: '#34d399',
+              boxShadow: '0 0 6px #34d399',
+            }}
+          />
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            Development Environment · Passkey & OAuth bypass enabled
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -100,10 +186,10 @@ export function LoginPage() {
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
-  marginBottom: 6,
-  fontSize: '0.8rem',
-  fontWeight: 600,
+  marginBottom: 7,
+  fontSize: '0.75rem',
+  fontWeight: 700,
   color: 'var(--text-secondary)',
   textTransform: 'uppercase',
-  letterSpacing: '0.04em',
+  letterSpacing: '0.05em',
 };

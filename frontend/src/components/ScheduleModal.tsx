@@ -63,10 +63,22 @@ export function ScheduleModal({ onClose, onSuccess }: Props) {
       .map((r) => r.trim().toLowerCase())
       .filter(Boolean);
 
-    if (!recipients.length) { error('Add at least one recipient'); return; }
-    if (!form.startAt) { error('Select a start time'); return; }
-    if (!form.subject.trim()) { error('Subject is required'); return; }
-    if (!form.body.trim()) { error('Body is required'); return; }
+    if (!recipients.length) {
+      error('Add at least one recipient');
+      return;
+    }
+    if (!form.startAt) {
+      error('Select a start time');
+      return;
+    }
+    if (!form.subject.trim()) {
+      error('Subject is required');
+      return;
+    }
+    if (!form.body.trim()) {
+      error('Body is required');
+      return;
+    }
 
     const payload: ScheduleEmailPayload = {
       subject: form.subject,
@@ -80,7 +92,7 @@ export function ScheduleModal({ onClose, onSuccess }: Props) {
     setLoading(true);
     try {
       const res = await emailsApi.schedule(payload);
-      success(`Scheduled ${res.scheduled} emails (campaign ${res.campaignId.slice(0, 8)}…)`);
+      success(`Scheduled ${res.scheduled} emails (Campaign ${res.campaignId.slice(0, 8)}…)`);
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -90,83 +102,180 @@ export function ScheduleModal({ onClose, onSuccess }: Props) {
     }
   };
 
-  // Min datetime is now+1min
+  // Min datetime is now + 1 min
   const minDatetime = new Date(Date.now() + 61_000).toISOString().slice(0, 16);
 
+  const recipientCount = form.recipients
+    .split(/[\n,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean).length;
+
+  const delaySeconds = Math.round(Number(form.delayMs) / 1000) || 60;
+
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className="modal-overlay"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div className="modal-panel">
+        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-              Schedule Campaign
-            </h2>
-            <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-              Bulk-schedule emails with per-sender rate limiting
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  background: 'rgba(139, 92, 246, 0.15)',
+                  color: '#a78bfa',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                  <polyline points="22,6 12,13 2,6" />
+                </svg>
+              </div>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                Create Email Campaign
+              </h2>
+            </div>
+            <p style={{ margin: '6px 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+              Enqueues persistent BullMQ jobs with atomic sender rate limiting.
             </p>
           </div>
+
           <button
             onClick={onClose}
-            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 20, padding: 0, lineHeight: 1 }}
-          >×</button>
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              fontSize: 16,
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.background = 'rgba(255, 255, 255, 0.1)';
+              (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.background = 'rgba(255, 255, 255, 0.05)';
+              (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)';
+            }}
+          >
+            ✕
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Form */}
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {/* Subject */}
           <div>
-            <label style={labelStyle}>Subject</label>
+            <label style={labelStyle}>Campaign Subject</label>
             <input
               id="schedule-subject"
               className="input-field"
-              placeholder="Your email subject…"
+              placeholder="e.g. Welcome to the ReachInbox Beta"
               value={form.subject}
               onChange={(e) => set('subject', e.target.value)}
               required
             />
           </div>
 
-          {/* Body */}
+          {/* Email Body */}
           <div>
-            <label style={labelStyle}>Body</label>
+            <label style={labelStyle}>Email Body</label>
             <textarea
               id="schedule-body"
               className="input-field"
-              placeholder="Your email body (plain text or HTML)…"
+              placeholder="Write your email content (supports HTML tags or plain text)…"
               value={form.body}
               onChange={(e) => set('body', e.target.value)}
               rows={4}
-              style={{ resize: 'vertical', minHeight: 100 }}
+              style={{ resize: 'vertical', minHeight: 90 }}
               required
             />
           </div>
 
           {/* Recipients */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <label style={labelStyle}>Recipients</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="button" className={`tab ${recipientMode === 'text' ? 'active' : ''}`} style={{ padding: '4px 12px', fontSize: '0.75rem' }} onClick={() => setRecipientMode('text')}>Text</button>
-                <button type="button" className={`tab ${recipientMode === 'csv' ? 'active' : ''}`} style={{ padding: '4px 12px', fontSize: '0.75rem' }} onClick={() => { setRecipientMode('csv'); fileRef.current?.click(); }}>CSV</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Target Recipients</label>
+                {recipientCount > 0 && (
+                  <span
+                    style={{
+                      background: 'rgba(56, 189, 248, 0.1)',
+                      color: '#38bdf8',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      padding: '2px 8px',
+                      borderRadius: 9999,
+                      border: '1px solid rgba(56, 189, 248, 0.25)',
+                    }}
+                  >
+                    {recipientCount} {recipientCount === 1 ? 'email' : 'emails'}
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  type="button"
+                  className={`tab ${recipientMode === 'text' ? 'active' : ''}`}
+                  style={{ padding: '4px 10px', fontSize: '0.75rem', height: 28 }}
+                  onClick={() => setRecipientMode('text')}
+                >
+                  Manual Text
+                </button>
+                <button
+                  type="button"
+                  className={`tab ${recipientMode === 'csv' ? 'active' : ''}`}
+                  style={{ padding: '4px 10px', fontSize: '0.75rem', height: 28 }}
+                  onClick={() => {
+                    setRecipientMode('csv');
+                    fileRef.current?.click();
+                  }}
+                >
+                  Upload CSV
+                </button>
               </div>
             </div>
+
             <textarea
               id="schedule-recipients"
-              className="input-field"
-              placeholder="one@example.com&#10;two@example.com"
+              className="input-field font-mono"
+              placeholder="alice@company.com&#10;bob@company.com, charlie@startup.io"
               value={form.recipients}
               onChange={(e) => set('recipients', e.target.value)}
               rows={3}
-              style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: '0.8rem' }}
+              style={{ resize: 'vertical', fontSize: '0.8rem', lineHeight: 1.5 }}
             />
-            <input ref={fileRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={handleCSVUpload} />
-            <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              {form.recipients.split(/[\n,]+/).filter(s => s.trim()).length} recipients entered
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv"
+              style={{ display: 'none' }}
+              onChange={handleCSVUpload}
+            />
+            <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Separate recipients with new lines or commas. CSV columns with email addresses are auto-parsed.
             </p>
           </div>
 
-          {/* Start At */}
+          {/* Schedule Time */}
           <div>
-            <label style={labelStyle}>Start At</label>
+            <label style={labelStyle}>Initial Send Time</label>
             <input
               id="schedule-start-at"
               type="datetime-local"
@@ -176,12 +285,15 @@ export function ScheduleModal({ onClose, onSuccess }: Props) {
               onChange={(e) => set('startAt', e.target.value)}
               required
             />
+            <p style={{ margin: '4px 0 0', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+              First email will dispatch at or after this time in your local timezone.
+            </p>
           </div>
 
-          {/* Delay & Hourly */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {/* Rate Limiting Parameters */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
-              <label style={labelStyle}>Delay Between Sends (ms)</label>
+              <label style={labelStyle}>Delay Between Sends</label>
               <input
                 id="schedule-delay-ms"
                 type="number"
@@ -191,10 +303,13 @@ export function ScheduleModal({ onClose, onSuccess }: Props) {
                 value={form.delayMs}
                 onChange={(e) => set('delayMs', e.target.value)}
               />
-              <p style={{ margin: '4px 0 0', fontSize: '0.72rem', color: 'var(--text-muted)' }}>min 60 000 ms (1 min)</p>
+              <p style={{ margin: '4px 0 0', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                {delaySeconds} seconds ({Math.round(delaySeconds / 60)} min) min 60s
+              </p>
             </div>
+
             <div>
-              <label style={labelStyle}>Hourly Rate Limit</label>
+              <label style={labelStyle}>Max Sends / Hour</label>
               <input
                 id="schedule-hourly-limit"
                 type="number"
@@ -204,14 +319,29 @@ export function ScheduleModal({ onClose, onSuccess }: Props) {
                 value={form.hourlyLimit}
                 onChange={(e) => set('hourlyLimit', e.target.value)}
               />
-              <p style={{ margin: '4px 0 0', fontSize: '0.72rem', color: 'var(--text-muted)' }}>emails per hour</p>
+              <p style={{ margin: '4px 0 0', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                Atomic rolling Redis rate limit
+              </p>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
-            <button type="button" className="btn-secondary" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
-            <button type="submit" className="btn-primary" disabled={loading} style={{ flex: 2 }}>
-              {loading ? 'Scheduling…' : '🚀 Schedule Campaign'}
+          {/* Dialog Action Buttons */}
+          <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={onClose}
+              style={{ flex: 1, padding: '12px 18px' }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={loading}
+              style={{ flex: 2, padding: '12px 20px' }}
+            >
+              {loading ? 'Dispatching to Queue…' : 'Schedule Campaign'}
             </button>
           </div>
         </form>
@@ -223,9 +353,9 @@ export function ScheduleModal({ onClose, onSuccess }: Props) {
 const labelStyle: React.CSSProperties = {
   display: 'block',
   marginBottom: 6,
-  fontSize: '0.8rem',
-  fontWeight: 600,
+  fontSize: '0.75rem',
+  fontWeight: 700,
   color: 'var(--text-secondary)',
   textTransform: 'uppercase',
-  letterSpacing: '0.04em',
+  letterSpacing: '0.05em',
 };
