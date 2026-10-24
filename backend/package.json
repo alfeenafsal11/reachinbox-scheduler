@@ -7,6 +7,8 @@
     "dev:api": "tsx watch src/server.ts",
     "dev:worker": "tsx watch src/worker.ts",
     "build": "tsc",
+    "start": "node dist/app.js",
+    "start:all": "node dist/app.js",
     "start:api": "node dist/server.js",
     "start:worker": "node dist/worker.js",
     "prisma:generate": "prisma generate",
