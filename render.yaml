@@ -1,18 +1,18 @@
 databases:
   - name: reachinbox-db
     databaseName: scheduler
-    user: postgres
+    user: scheduler_user
     plan: free
 
 services:
-  # 1. Redis with noeviction (required for BullMQ queue stability)
+  # 1. Managed Redis
   - type: redis
     name: reachinbox-redis
     ipAllowList: []
     plan: free
     maxmemoryPolicy: noeviction
 
-  # 2. Backend API + Embedded BullMQ Worker (Runs on Render Free tier)
+  # 2. Backend API + Embedded BullMQ Worker (Free Web Service)
   - type: web
     name: reachinbox-api
     runtime: node
@@ -37,7 +37,7 @@ services:
           name: reachinbox-redis
           property: connectionString
 
-  # 3. Frontend Dashboard
+  # 3. Frontend Dashboard (Free Static Site)
   - type: web
     name: reachinbox-dashboard
     runtime: static
@@ -45,8 +45,5 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
     envVars:
-      - key: VITE_API_URL
-        fromService:
-          type: web
-          name: reachinbox-api
-          property: url
+      - key: VITE_BACKEND_URL
+        sync: false
