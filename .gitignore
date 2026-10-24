@@ -19,6 +19,7 @@ build/
 pgdata/
 tools/
 *.log
+*.rdb
 
 # IDE
 .vscode/
