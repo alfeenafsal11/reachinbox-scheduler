@@ -6,6 +6,8 @@ import { env } from './config/env';
 import { logger } from './config/logger';
 import { errorHandler } from './middleware/errorHandler';
 
+import { authRouter } from './modules/auth/auth.routes';
+
 const app = express();
 
 app.use(helmet());
@@ -26,6 +28,9 @@ app.get('/health', (_req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// Auth routes
+app.use('/auth', authRouter);
 
 app.use(errorHandler);
 
