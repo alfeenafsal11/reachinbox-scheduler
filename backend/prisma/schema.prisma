@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EmailStatus {
+  scheduled
+  delayed
+  processing
+  sent
+  failed
+}
+
+model User {
+  id        String           @id @default(uuid())
+  googleId  String           @unique
+  name      String
+  email     String           @unique
+  avatarUrl String?
+  createdAt DateTime         @default(now())
+  slack     SlackConnection?
+  campaigns Campaign[]
+  emails    Email[]
+}
+
+model SlackConnection {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  webhookUrl  String
+  channel     String?
+  teamName    String?
+  connectedAt DateTime @default(now())
+}
+
+model Sender {
+  id          String  @id @default(uuid())
+  email       String  @unique
+  smtpHost    String
+  smtpPort    Int
+  smtpUser    String
+  smtpPass    String
+  hourlyLimit Int?
+  emails      Email[]
+}
+
+model Campaign {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  subject     String
+  body        String
+  startAt     DateTime
+  delayMs     Int
+  hourlyLimit Int
+  totalCount  Int
+  createdAt   DateTime @default(now())
+  emails      Email[]
+}
+
+model Email {
+  id          String      @id @default(uuid())
+  campaignId  String
+  campaign    Campaign    @relation(fields: [campaignId], references: [id])
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  senderId    String
+  sender      Sender      @relation(fields: [senderId], references: [id])
+  toEmail     String
+  subject     String
+  body        String
+  scheduledAt DateTime
+  sentAt      DateTime?
+  status      EmailStatus @default(scheduled)
+  attempts    Int         @default(0)
+  messageId   String?
+  previewUrl  String?
+  error       String?
+  createdAt   DateTime    @default(now())
+
+  @@index([userId, status, scheduledAt])
+  @@index([campaignId])
+}
