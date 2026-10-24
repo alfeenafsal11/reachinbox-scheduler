@@ -344,8 +344,27 @@ export function EmailsTable({
                   </div>
 
                   {/* Status Column */}
-                  <div style={{ minWidth: 0, textAlign: 'right', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+                  <div style={{ minWidth: 0, textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                     <StatusBadge status={email.status} />
+                    {email.previewUrl && (
+                      <a
+                        href={email.previewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          fontSize: '0.72rem',
+                          color: '#a78bfa',
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 2,
+                          fontWeight: 600,
+                        }}
+                        title="View rendered email on Ethereal sandbox"
+                      >
+                        View in Ethereal ↗
+                      </a>
+                    )}
                   </div>
                 </div>
               ))}

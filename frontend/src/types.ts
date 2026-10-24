@@ -42,6 +42,7 @@ export interface Email {
   sentAt: string | null;
   attempts: number;
   errorMessage: string | null;
+  previewUrl?: string | null;
   createdAt: string;
   sender?: { email: string };
   campaign?: { id: string; subject: string };
