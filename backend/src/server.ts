@@ -40,6 +40,7 @@ app.use(errorHandler);
 
 import { senderService } from './modules/senders/sender.service';
 import { initElasticsearch } from './modules/search/esClient';
+import { reconcileQueue } from './queue/reconcile';
 
 if (require.main === module) {
   app.listen(env.PORT, async () => {
@@ -47,6 +48,7 @@ if (require.main === module) {
     try {
       await senderService.bootstrapSenders();
       await initElasticsearch();
+      await reconcileQueue();
     } catch (err) {
       logger.error({ err }, 'Error during API server boot initialization');
     }

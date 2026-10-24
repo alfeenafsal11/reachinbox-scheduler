@@ -1,5 +1,6 @@
 import { createEmailWorker } from './queue/email.worker';
 import { senderService } from './modules/senders/sender.service';
+import { reconcileQueue } from './queue/reconcile';
 import { logger } from './config/logger';
 
 async function bootstrap() {
@@ -7,6 +8,9 @@ async function bootstrap() {
 
   // Ensure Ethereal senders are bootstrapped and cached
   await senderService.bootstrapSenders();
+
+  // Run startup queue reconciliation
+  await reconcileQueue();
 
   const worker = createEmailWorker();
   logger.info('✅ Email Worker is listening for jobs on BullMQ');
