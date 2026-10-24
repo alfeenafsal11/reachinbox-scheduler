@@ -9,10 +9,18 @@ import { errorHandler } from './middleware/errorHandler';
 import { authRouter } from './modules/auth/auth.routes';
 import { emailsRouter } from './modules/emails/emails.routes';
 import { slackRouter } from './modules/slack/slack.routes';
+import { searchRouter } from './modules/search/routes';
+import { requireAuth } from './middleware/auth';
+import { emailQueue } from './queue/email.queue';
+import { createBullBoard } from '@bull-board/api';
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
+import { ExpressAdapter } from '@bull-board/express';
 
 const app = express();
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false, // Allows Bull Board dashboard assets to render cleanly
+}));
 app.use(
   cors({
     origin: env.FRONTEND_URL,
@@ -31,8 +39,20 @@ app.get('/health', (_req, res) => {
   });
 });
 
+// Bull Board UI for email queue inspection (mounted behind requireAuth)
+const bullBoardAdapter = new ExpressAdapter();
+bullBoardAdapter.setBasePath('/admin/queues');
+createBullBoard({
+  queues: [new BullMQAdapter(emailQueue)],
+  serverAdapter: bullBoardAdapter,
+});
+app.use('/admin/queues', requireAuth, bullBoardAdapter.getRouter());
+
 // Auth routes
 app.use('/auth', authRouter);
+
+// Search routes
+app.use('/api/emails', searchRouter);
 
 // Emails API routes
 app.use('/api/emails', emailsRouter);
