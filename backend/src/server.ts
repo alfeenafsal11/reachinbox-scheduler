@@ -7,6 +7,7 @@ import { logger } from './config/logger';
 import { errorHandler } from './middleware/errorHandler';
 
 import { authRouter } from './modules/auth/auth.routes';
+import { emailsRouter } from './modules/emails/emails.routes';
 
 const app = express();
 
@@ -32,11 +33,23 @@ app.get('/health', (_req, res) => {
 // Auth routes
 app.use('/auth', authRouter);
 
+// Emails API routes
+app.use('/api/emails', emailsRouter);
+
 app.use(errorHandler);
 
+import { senderService } from './modules/senders/sender.service';
+import { initElasticsearch } from './modules/search/esClient';
+
 if (require.main === module) {
-  app.listen(env.PORT, () => {
+  app.listen(env.PORT, async () => {
     logger.info(`🚀 API Server running on port ${env.PORT} (${env.BACKEND_URL})`);
+    try {
+      await senderService.bootstrapSenders();
+      await initElasticsearch();
+    } catch (err) {
+      logger.error({ err }, 'Error during API server boot initialization');
+    }
   });
 }
 
