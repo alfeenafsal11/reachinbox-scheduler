@@ -6,7 +6,7 @@
   "scripts": {
     "dev:api": "tsx watch src/server.ts",
     "dev:worker": "tsx watch src/worker.ts",
-    "build": "tsc",
+    "build": "tsc && node -e \"const fs=require('fs'); fs.mkdirSync('dist/queue/scripts', {recursive:true}); fs.copyFileSync('src/queue/scripts/reserveSlot.lua', 'dist/queue/scripts/reserveSlot.lua');\"",
     "start": "node dist/app.js",
     "start:all": "node dist/app.js",
     "start:api": "node dist/server.js",

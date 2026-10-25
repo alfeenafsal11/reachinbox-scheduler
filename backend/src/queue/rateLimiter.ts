@@ -3,8 +3,44 @@ import path from 'path';
 import { redis } from '../config/redis';
 import { env } from '../config/env';
 
-const luaScriptPath = path.resolve(__dirname, 'scripts/reserveSlot.lua');
-const luaScript = fs.readFileSync(luaScriptPath, 'utf8');
+const DEFAULT_LUA_SCRIPT = `-- KEYS[1] = key prefix e.g. "rl:{senderId}"
+-- ARGV[1] = nowMs, ARGV[2] = limit, ARGV[3] = maxWindowsAhead
+local HOUR = 3600000
+local now = tonumber(ARGV[1])
+local limit = tonumber(ARGV[2])
+local maxAhead = tonumber(ARGV[3])
+local base = math.floor(now / HOUR) * HOUR
+for i = 0, maxAhead do
+  local windowStart = base + i * HOUR
+  local key = KEYS[1] .. ":" .. windowStart
+  local c = tonumber(redis.call('GET', key) or '0')
+  if c < limit then
+    local n = redis.call('INCR', key)
+    redis.call('PEXPIRE', key, (i + 2) * HOUR)
+    return { i, windowStart, n }
+  end
+end
+return { -1, 0, 0 }
+`;
+
+function getLuaScript(): string {
+  const candidates = [
+    path.resolve(__dirname, 'scripts/reserveSlot.lua'),
+    path.resolve(__dirname, '../../src/queue/scripts/reserveSlot.lua'),
+    path.resolve(process.cwd(), 'src/queue/scripts/reserveSlot.lua'),
+    path.resolve(process.cwd(), 'backend/src/queue/scripts/reserveSlot.lua'),
+  ];
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(c)) {
+        return fs.readFileSync(c, 'utf8');
+      }
+    } catch {}
+  }
+  return DEFAULT_LUA_SCRIPT;
+}
+
+const luaScript = getLuaScript();
 
 export interface SlotReservation {
   windowOffset: number;

@@ -16,14 +16,32 @@ import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 
+import path from 'path';
+import fs from 'fs';
+
 const app = express();
 
 app.use(helmet({
   contentSecurityPolicy: false, // Allows Bull Board dashboard assets to render cleanly
 }));
+
 app.use(
   cors({
-    origin: env.FRONTEND_URL,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (curl, server-to-server, or same-origin)
+      if (!origin) return callback(null, true);
+      if (
+        origin === env.FRONTEND_URL ||
+        origin.includes('localhost') ||
+        origin.includes('127.0.0.1') ||
+        origin.endsWith('.hf.space') ||
+        origin.includes('huggingface.co') ||
+        origin.includes('onrender.com')
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, true);
+    },
     credentials: true,
   })
 );
@@ -60,23 +78,56 @@ app.use('/api/emails', emailsRouter);
 // Slack API routes
 app.use('/api/slack', slackRouter);
 
+// Serve frontend static assets in production if built
+const frontendDistCandidates = [
+  path.resolve(__dirname, '../../frontend/dist'),
+  path.resolve(process.cwd(), 'frontend/dist'),
+  path.resolve(process.cwd(), '../frontend/dist'),
+];
+
+for (const candidate of frontendDistCandidates) {
+  if (fs.existsSync(candidate)) {
+    logger.info(`Serving static frontend build from ${candidate}`);
+    app.use(express.static(candidate));
+    app.get('*', (req, res, next) => {
+      if (
+        req.path.startsWith('/api') ||
+        req.path.startsWith('/auth') ||
+        req.path.startsWith('/admin') ||
+        req.path.startsWith('/health')
+      ) {
+        return next();
+      }
+      res.sendFile(path.join(candidate, 'index.html'));
+    });
+    break;
+  }
+}
+
 app.use(errorHandler);
 
 import { senderService } from './modules/senders/sender.service';
 import { initElasticsearch } from './modules/search/esClient';
 import { reconcileQueue } from './queue/reconcile';
 
-if (require.main === module) {
-  app.listen(env.PORT, async () => {
-    logger.info(`🚀 API Server running on port ${env.PORT} (${env.BACKEND_URL})`);
-    try {
-      await senderService.bootstrapSenders();
-      await initElasticsearch();
-      await reconcileQueue();
-    } catch (err) {
-      logger.error({ err }, 'Error during API server boot initialization');
-    }
+export function startServer(): Promise<void> {
+  return new Promise((resolve) => {
+    app.listen(env.PORT, async () => {
+      logger.info(`🚀 API Server running on port ${env.PORT} (${env.BACKEND_URL})`);
+      try {
+        await senderService.bootstrapSenders();
+        await initElasticsearch();
+        await reconcileQueue();
+      } catch (err) {
+        logger.error({ err }, 'Error during API server boot initialization');
+      }
+      resolve();
+    });
   });
+}
+
+if (require.main === module) {
+  startServer();
 }
 
 export { app };

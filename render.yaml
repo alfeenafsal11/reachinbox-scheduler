@@ -1,12 +1,5 @@
 services:
-  # 1. Managed Redis
-  - type: redis
-    name: reachinbox-redis
-    ipAllowList: []
-    plan: free
-    maxmemoryPolicy: noeviction
-
-  # 2. Backend API + Embedded BullMQ Worker (Free Web Service)
+  # 1. Backend API + Embedded BullMQ Worker (Free Web Service)
   - type: web
     name: reachinbox-api
     runtime: node
@@ -24,12 +17,9 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: REDIS_URL
-        fromService:
-          type: redis
-          name: reachinbox-redis
-          property: connectionString
+        sync: false
 
-  # 3. Frontend Dashboard (Free Static Site)
+  # 2. Frontend Dashboard (Free Static Site)
   - type: web
     name: reachinbox-dashboard
     runtime: static
