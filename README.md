@@ -1,332 +1,318 @@
 # ReachInbox — Full-Stack Email Job Scheduler
 
-A **production-grade** email scheduling service with a React dashboard. Schedule bulk email campaigns, control per-sender rate limits, and monitor delivery — all backed by BullMQ persistent delayed jobs, Redis, and PostgreSQL.
+[![Live Dashboard](https://img.shields.io/badge/HuggingFace_Spaces-Live_Dashboard-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black)](https://alfeenafsal-reachinbox-scheduler-ui.static.hf.space)
+[![Render Backend](https://img.shields.io/badge/Render-API_Active-46E3B7?style=for-the-badge&logo=render&logoColor=black)](https://reachinbox-api-cu2i.onrender.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.4-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![BullMQ](https://img.shields.io/badge/BullMQ-5.8-E0234E?style=for-the-badge&logo=redis&logoColor=white)](https://bullmq.io/)
+[![Prisma](https://img.shields.io/badge/Prisma-5.14-2D3748?style=for-the-badge&logo=prisma&logoColor=white)](https://www.prisma.io/)
+
+A **production-grade, distributed email scheduling service** with a modern React dashboard. Schedule bulk email campaigns, control per-sender rate limits with atomic Redis Lua scripts, and monitor delivery with multi-worker idempotency and startup reconciliation.
 
 ---
 
-## ✨ Features
+## 🌐 Live Deployments
 
-| Feature | Details |
+| Component | Platform | URL |
+|---|---|---|
+| **Frontend Dashboard** | Hugging Face Spaces | [alfeenafsal-reachinbox-scheduler-ui.static.hf.space](https://alfeenafsal-reachinbox-scheduler-ui.static.hf.space) |
+| **Space Repository** | Hugging Face Hub | [huggingface.co/spaces/alfeenafsal/reachinbox-scheduler-ui](https://huggingface.co/spaces/alfeenafsal/reachinbox-scheduler-ui) |
+| **Backend REST API** | Render | [reachinbox-api-cu2i.onrender.com](https://reachinbox-api-cu2i.onrender.com) |
+| **Health Check** | Render | [reachinbox-api-cu2i.onrender.com/health](https://reachinbox-api-cu2i.onrender.com/health) |
+| **Queue Inspector (Bull Board)** | Render | [reachinbox-api-cu2i.onrender.com/admin/queues](https://reachinbox-api-cu2i.onrender.com/admin/queues) |
+
+---
+
+## ✨ Features & Implementation
+
+| Feature | Implementation Details |
 |---|---|
-| **Persistent Job Scheduling** | BullMQ delayed jobs stored in Redis (`--appendonly yes`) — survives crashes and restarts |
-| **Bulk Campaigns** | Schedule thousands of emails at once via CSV upload or text paste |
-| **Per-Sender Rate Limiting** | Atomic Redis Lua script enforces configurable hourly limits across multiple workers without race conditions |
-| **Minimum Send Gap** | Configurable minimum delay (ms) between consecutive sends per sender |
-| **Multi-Worker Safe** | Atomic DB claim prevents duplicate processing even across concurrent workers |
-| **Startup Reconciliation** | On boot, re-queues any `scheduled`/`delayed` jobs lost during a crash or Redis eviction |
-| **Full-Text Search** | Elasticsearch with graceful DB fallback — ES failures never block scheduling |
-| **Real OAuth** | Google OAuth login + Slack OAuth for webhook rate-limit alerts |
-| **Bull Board UI** | Visual queue inspector at `/admin/queues` |
-| **React Dashboard** | Glassmorphism dark UI — login, stat cards, paginated tables, CSV import, schedule modal |
+| **Persistent Delayed Queue** | Backed by **BullMQ** on Redis with `--appendonly yes`. Delayed jobs persist across process restarts, container crashes, and redeployments. |
+| **Multi-Worker Idempotency** | **3-layer idempotency guard**: (1) Queue-level deduplication via deterministic `jobId = emailId`, (2) Database-level atomic state claim (`UPDATE "Email" SET status = 'processing' WHERE status IN ('scheduled', 'delayed') RETURNING *`), (3) Deterministic `Message-ID` preventing SMTP re-delivery. |
+| **Atomic Lua Rate Limiting** | Custom Redis Lua script (`reserveSlot.lua`) calculates and enforces hourly quotas per sender. If the quota is exceeded, it atomically calculates the exact delay for the next available window and re-queues the job with zero race conditions. |
+| **Sender Gap Throttling** | Enforces a minimum configurable spacing (e.g. 2000ms) between consecutive sends for each sender key (`SET gap:{senderId} 1 NX PX <MIN_DELAY>`). |
+| **Startup Queue Reconciliation** | On every boot, `reconcileQueue()` scans PostgreSQL for orphaned or interrupted jobs from sudden crashes, resets stale `processing` rows, and re-enqueues them into BullMQ. |
+| **Automatic Ethereal SMTP & Previews** | Automatically bootstraps Nodemailer Ethereal test accounts. Sent emails store a real web preview link (`previewUrl`) viewable directly in the dashboard. |
+| **Full-Text Search with Fallback** | Elasticsearch 8 indexing on email subject, body, and recipient with an automatic, seamless PostgreSQL fallback if Elasticsearch is offline. |
+| **Dual Authentication** | JWT with httpOnly cookies + Authorization Bearer header support. Includes **Google OAuth 2.0** and **One-Click Dev Login** for testing. |
+| **Slack Webhook Alerts** | Slack OAuth integration with automated webhook notifications when hourly sender rate limits are reached. |
+| **Glassmorphism Dark UI** | React 19 + Vite dashboard featuring live delivery stat cards, paginated scheduled/sent tables, CSV upload modal, and search inspector. |
+| **Bull Board Dashboard** | Real-time queue visualizer at `/admin/queues` showing active, delayed, waiting, and completed jobs. |
 
 ---
 
-## 🗂 Project Structure
+## 🏗 System Architecture
 
 ```
-PROJECT_ALF/
-├── backend/                  # Express API + BullMQ Worker
-│   └── src/
-│       ├── config/           # env, logger, prisma, redis
-│       ├── middleware/        # auth, validation, error handler
-│       ├── modules/
-│       │   ├── auth/         # Google OAuth + JWT cookies + dev login
-│       │   ├── emails/       # Schedule, list, search endpoints
-│       │   ├── search/       # Elasticsearch indexer + search routes
-│       │   ├── senders/      # Ethereal SMTP sender bootstrap
-│       │   └── slack/        # Slack OAuth + webhook notifier
-│       ├── queue/            # BullMQ setup, email.queue, reconcile
-│       ├── server.ts         # API server entry point
-│       └── worker.ts         # BullMQ worker entry point
-│
-├── frontend/                 # React + Vite + Tailwind v4
-│   └── src/
-│       ├── api/              # Fetch wrappers (auth, emails)
-│       ├── components/       # EmailsTable, ScheduleModal, StatusBadge, Toaster
-│       ├── context/          # AuthContext (session management)
-│       ├── pages/            # LoginPage, DashboardPage
-│       └── types.ts          # Shared TypeScript interfaces
-│
-├── docs/
-│   └── DECISIONS.md          # Architecture & engineering decisions log
-├── scripts/
-│   └── start-local-infra.ts  # Zero-install Windows local runner
-├── tools/                    # Portable Redis binary (Windows)
-├── docker-compose.yml        # PostgreSQL + Redis + Elasticsearch
-└── .env.example              # All required environment variables
+                            ┌───────────────────────────────────┐
+                            │    React Dashboard (Vite 8)       │
+                            │  Hugging Face / localhost:5173   │
+                            └─────────────────┬─────────────────┘
+                                              │ HTTP / JSON (Credentials / Bearer)
+                                              ▼
+                            ┌───────────────────────────────────┐
+                            │      Express API (server.ts)      │
+                            │      Render / localhost:4000      │
+                            └───┬─────────────┬─────────────┬───┘
+                                │             │             │
+                1. Create Email │             │             │ 2. Push Delayed Job
+                & Campaign Rows │             │             │    (jobId = emailId)
+                                ▼             ▼             ▼
+                     ┌──────────────┐   ┌───────────┐   ┌─────────────────┐
+                     │  PostgreSQL  │   │ Elastic-  │   │  BullMQ Queue   │
+                     │ (Neon/Prisma)│   │  search   │   │  (Redis 7 AOF)  │
+                     └──────────────┘   └───────────┘   └────────┬────────┘
+                                                                 │
+                                3. Pull delayed job when due    │
+                                                                 ▼
+                                                        ┌─────────────────┐
+                                                        │  BullMQ Worker  │
+                                                        │   (worker.ts)   │
+                                                        └────────┬────────┘
+                                                                 │
+                                          4. Atomic Lua Rate Limit Check
+                                          5. Atomic DB Row Claim ('processing')
+                                                                 │
+                                                                 ▼
+                                                        ┌─────────────────┐
+                                                        │  Ethereal SMTP  │
+                                                        │  (Test Preview) │
+                                                        └─────────────────┘
 ```
+
+### Rate Limiting & Scheduling Workflow:
+1. **Schedule**: User submits campaign (start time, delay, hourly limit, recipients). Emails are stored in PostgreSQL with status `scheduled`.
+2. **Enqueue**: Each email is added to BullMQ with `delay = startAt + (index * delayMs) - now` and `jobId = email.id`.
+3. **Execution**: When delay expires, a worker picks up the job.
+4. **Atomic Claim**: Worker executes an atomic SQL update:
+   ```sql
+   UPDATE "Email"
+   SET status = 'processing', attempts = attempts + 1
+   WHERE id = :emailId AND status IN ('scheduled', 'delayed')
+   RETURNING *;
+   ```
+   If 0 rows are returned, another worker already claimed it; the job exits safely.
+5. **Lua Rate Limit Check**:
+   The worker executes `reserveSlot.lua` against Redis. If the current 1-hour window has available slots, it increments the window counter and proceeds. If full, it computes the future timestamp `runAt` and re-delays the job.
+6. **Dispatch & Preview**: Nodemailer dispatches through the assigned Ethereal account, saves `sentAt` and `previewUrl`, and marks status `sent`.
 
 ---
 
-## 🚀 Quick Start
+## ⚙️ Environment Variables
 
-### Option A — Docker (recommended for Linux/macOS)
-
-```bash
-# 1. Clone & configure
-cp .env.example .env
-# Edit .env — set JWT_SECRET, Google/Slack OAuth keys
-
-# 2. Start infrastructure
-docker compose up -d
-
-# 3. Install & migrate backend
-cd backend
-npm install
-npx prisma db push
-
-# 4. Start API server + worker (two terminals)
-npm run dev:api
-npm run dev:worker
-
-# 5. Start frontend (new terminal)
-cd ../frontend
-npm install
-npm run dev
-```
-
-Open **http://localhost:5173**
-
----
-
-### Option B — Zero-Install on Windows (no Docker required)
-
-This project ships with a **portable Redis** binary and uses **embedded-postgres**, so you can run everything natively on Windows with no external installs.
-
-> [!NOTE]
-> Run all commands starting from the project root directory (`PROJECT_ALF`).
-
-```powershell
-# 1. Configure environment (from project root)
-Copy-Item .env.example .env
-# Edit .env if needed (default values work with zero-install)
-
-# 2. Install dependencies
-cd backend
-npm install
-cd ../frontend
-npm install
-cd ..
-
-# 3. Start local infra (Redis on :6379 + embedded Postgres on :5432)
-# Run from project root — will spawn background Redis & Postgres
-npx tsx scripts/start-local-infra.ts
-
-# 4. Run DB migrations (from project root)
-cd backend
-npx prisma db push
-cd ..
-
-# 5. In separate terminal windows:
-# Terminal 1 — API Server:
-cd backend
-npm run dev:api       # API on http://localhost:4000
-
-# Terminal 2 — Email Worker:
-cd backend
-npm run dev:worker    # Background BullMQ worker
-
-# Terminal 3 — Frontend:
-cd frontend
-npm run dev           # Dashboard on http://localhost:5173
-```
-
-> [!TIP]
-> **Windows `EPERM` error on `npx prisma db push`?**
-> If you get `EPERM: operation not permitted, rename ... query_engine-windows.dll.node`, it means your backend server (`npm run dev:api`) is currently running and Windows has locked the native engine file.
-> - **Fix 1**: Stop `npm run dev:api` (press `Ctrl+C`), run `npx prisma db push`, then restart `npm run dev:api`.
-> - **Fix 2**: Or run `npx prisma db push --skip-generate` (the database schema syncs without needing to overwrite the locked client file).
-
----
-
-## ⚙️ Configuration
-
-Copy `.env.example` to `.env` and fill in the values:
+Create a `.env` file in the project root:
 
 ```env
-# PostgreSQL
+# Database (PostgreSQL — local or Neon.tech)
 DATABASE_URL=postgresql://postgres:password@localhost:5432/scheduler?schema=public
 
-# Redis (must have AOF persistence enabled)
+# Redis (local or Upstash Redis URL)
 REDIS_URL=redis://localhost:6379
 
-# Elasticsearch (optional — app falls back to DB if offline)
+# Elasticsearch (Optional — falls back to PostgreSQL automatically)
 ELASTICSEARCH_URL=http://localhost:9200
 
-# Auth
-JWT_SECRET=change_me_32_chars_min
-FRONTEND_URL=http://localhost:5173
-BACKEND_URL=http://localhost:4000
+# Auth & URLs
+JWT_SECRET=reachinbox_super_secret_jwt_production_key_32chars
 PORT=4000
+BACKEND_URL=http://localhost:4000
+FRONTEND_URL=http://localhost:5173
 
-# Google OAuth — https://console.cloud.google.com/
+# Google OAuth (Optional — Dev Login works out of the box)
 GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 
-# Slack OAuth — https://api.slack.com/apps
+# Slack OAuth (Optional)
 SLACK_CLIENT_ID=your-slack-client-id
 SLACK_CLIENT_SECRET=your-slack-client-secret
 SLACK_REDIRECT_URI=http://localhost:4000/api/slack/callback
 
-# Worker tuning
+# Queue & Worker Settings
 WORKER_CONCURRENCY=5
 MIN_DELAY_BETWEEN_EMAILS_MS=2000
 MAX_EMAILS_PER_HOUR_PER_SENDER=200
 ETHEREAL_SENDER_COUNT=3
+QUEUE_NAME=email-queue
 ```
-
-> **Note:** Google and Slack OAuth keys are optional for local development. Use the **Dev Login** button on the login page to sign in without OAuth.
 
 ---
 
-## 🖥 Dashboard
+## 🚀 Local Setup Instructions
 
-| Screen | Description |
-|---|---|
-| **Login** | Dev-mode login (no password) or Google OAuth |
-| **Dashboard** | Live stat cards — scheduled, sent, failed counts |
-| **Scheduled tab** | Paginated list of pending emails with sender & schedule time |
-| **Sent / Failed tab** | Historical delivery records with timestamps |
-| **Search tab** | Full-text search across all emails by subject, recipient, or body |
-| **New Campaign modal** | Schedule a bulk campaign — paste recipients or upload a CSV |
+### Prerequisites
+- Node.js 18+ (tested on Node 20 & 24)
+- Redis 5.0+ (local or free [Upstash Redis](https://upstash.com))
+- PostgreSQL 14+ (local or free [Neon.tech](https://neon.tech))
+
+### 1. Clone & Install
+```bash
+git clone https://github.com/alfeenafsal11/reachinbox-scheduler.git
+cd reachinbox-scheduler
+
+# Install backend dependencies
+cd backend
+npm install
+
+# Install frontend dependencies
+cd ../frontend
+npm install
+cd ..
+```
+
+### 2. Configure Environment & Database
+```bash
+cp .env.example .env
+# Edit .env and enter your DATABASE_URL and REDIS_URL
+
+# Sync Prisma Schema
+cd backend
+npm run prisma:push
+cd ..
+```
+
+### 3. Start Infrastructure & Servers
+
+**Option A — Running Locally (Two Terminals):**
+
+*Terminal 1 (Backend API & Worker):*
+```bash
+cd backend
+npm start
+# Server + Worker listening on http://localhost:4000
+```
+
+*Terminal 2 (Frontend Dashboard):*
+```bash
+cd frontend
+npm run dev
+# Dashboard running on http://localhost:5173
+```
+
+**Option B — Zero-Install on Windows (No Docker Required):**
+```powershell
+# Starts embedded Postgres and portable Redis automatically:
+npx tsx scripts/start-local-infra.ts
+
+# In separate terminals:
+npm --prefix backend run dev:api
+npm --prefix backend run dev:worker
+npm --prefix frontend run dev
+```
+
+Open **http://localhost:5173** and click **Dev Login** to sign in immediately without Google OAuth setup!
+
+---
+
+## ☁️ Cloud Deployment Instructions
+
+### 1. Backend on Render (Web Service)
+1. Fork or push this repository to your GitHub account.
+2. Sign in to [Render](https://dashboard.render.com) and click **New +** → **Blueprint**.
+3. Select this repository (`reachinbox-scheduler`). Render will read [`render.yaml`](render.yaml).
+4. Provide the two required environment variables when prompted:
+   - `DATABASE_URL`: Connection string from [Neon.tech](https://neon.tech) or Render PostgreSQL.
+   - `REDIS_URL`: Connection string from [Upstash](https://upstash.com) (`rediss://...`).
+5. Click **Apply**. Render will install, migrate the database schema, compile TypeScript, and boot both the API server and BullMQ background worker!
+
+### 2. Frontend on Hugging Face Spaces (Static Space)
+1. Log in to [Hugging Face](https://huggingface.co).
+2. Create a new Space:
+   - **SDK**: `Static`
+   - **License**: `MIT`
+3. In `frontend/`, build the production bundle pointing to your live Render backend:
+   ```bash
+   export VITE_BACKEND_URL="https://your-api.onrender.com"
+   npm --prefix frontend run build
+   ```
+4. Upload the contents of `frontend/dist/` to the root of your Hugging Face Space repository.
+5. Your dashboard is instantly live with zero maintenance!
 
 ---
 
 ## 📡 API Reference
 
-All endpoints are under `http://localhost:4000`.
-
-### Auth
-
-| Method | Path | Description |
+### Auth Endpoints
+| Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/auth/dev-login` | Dev-mode login `{ email, name }` — sets JWT cookie |
-| `GET` | `/auth/me` | Returns current user (requires auth cookie) |
-| `POST` | `/auth/logout` | Clears session cookie |
-| `GET` | `/auth/google` | Start Google OAuth flow |
-| `GET` | `/auth/google/callback` | Google OAuth callback |
+| `POST` | `/auth/dev-login` | Instant developer login with `{ "email": "user@example.com", "name": "User" }` |
+| `GET` | `/auth/me` | Fetch active authenticated user session |
+| `POST` | `/auth/logout` | Clear session cookie and revoke token |
+| `GET` | `/auth/google` | Initiate Google OAuth 2.0 flow |
+| `GET` | `/auth/google/callback` | Google OAuth callback handler |
 
-### Emails
-
-| Method | Path | Description |
+### Email & Campaign Endpoints
+| Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/emails/schedule` | Schedule a campaign (see body below) |
-| `GET` | `/api/emails/scheduled` | List pending emails `?page=1&pageSize=20` |
-| `GET` | `/api/emails/sent` | List sent/failed emails `?page=1&pageSize=20` |
-| `GET` | `/api/emails/search` | Search emails `?q=text&status=sent&page=1` |
+| `POST` | `/api/emails/schedule` | Schedule a campaign (supports array of recipients, delay, hourly limit) |
+| `GET` | `/api/emails/scheduled` | List pending/delayed emails with pagination (`?page=1&pageSize=20`) |
+| `GET` | `/api/emails/sent` | List delivered and failed emails with Ethereal preview links |
+| `GET` | `/api/emails/search` | Full-text search across emails (`?q=keyword&status=sent`) |
 
-**Schedule request body:**
-```json
-{
-  "subject": "Hello from ReachInbox",
-  "body": "Email body (plain text or HTML)",
-  "recipients": ["alice@example.com", "bob@example.com"],
-  "startAt": "2025-01-15T10:00:00.000Z",
-  "delayMs": 60000,
-  "hourlyLimit": 50
-}
-```
-
-### System
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/health` | Service health check |
-| `GET` | `/admin/queues` | Bull Board queue inspector (requires auth) |
-| `GET` | `/api/slack/connect` | Start Slack OAuth |
-| `GET` | `/api/slack/status` | Slack connection status |
-| `DELETE` | `/api/slack/disconnect` | Disconnect Slack |
-
----
-
-## 🏗 Architecture
-
-```
-                ┌──────────────────┐
-    Browser     │  React Dashboard │ :5173
-                └────────┬─────────┘
-                         │ HTTP / Proxy
-                ┌────────▼─────────┐
-                │   Express API    │ :4000
-                │  server.ts       │
-                └──┬──────┬────────┘
-                   │      │
-         ┌─────────▼──┐  ┌▼───────────────┐
-         │ PostgreSQL  │  │  BullMQ Queue  │
-         │  (Prisma)   │  │  (Redis AOF)   │
-         └─────────┬───┘  └──────┬─────────┘
-                   │             │
-                ┌──▼─────────────▼──┐
-                │   BullMQ Worker   │
-                │   worker.ts       │
-                └───────────────────┘
-                          │
-                ┌─────────▼────────┐
-                │  Ethereal SMTP   │
-                │  (fake emails)   │
-                └──────────────────┘
-```
-
-**Rate Limiting Flow:**
-1. Worker picks up a job → calls Redis Lua `reserveSlot.lua`
-2. Lua atomically checks the current hourly window for that sender
-3. If the window is full → computes `runAt` in a future window → job is re-delayed
-4. Otherwise → per-sender gap key `SET gap:{senderId} 1 NX PX <MIN_DELAY>` is set → email is sent
-
----
-
-## 🔧 Development Scripts
-
-### Backend
-
+### Example Schedule Campaign Request:
 ```bash
-npm run dev:api        # Start API server with hot-reload (tsx watch)
-npm run dev:worker     # Start worker with hot-reload
-npm run build          # Compile TypeScript to dist/
-npm run typecheck      # Type-check without emitting
-npx prisma studio      # Open Prisma DB browser
-npx prisma db push     # Sync schema to DB
+curl -X POST http://localhost:4000/api/emails/schedule \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <TOKEN>" \
+  -d '{
+    "subject": "Exclusive Launch Invitation",
+    "body": "<p>Hello from ReachInbox! Your scheduled demo is ready.</p>",
+    "recipients": ["client1@example.com", "client2@example.com"],
+    "startAt": "2026-10-25T12:00:00.000Z",
+    "delayMs": 2000,
+    "hourlyLimit": 100
+  }'
 ```
 
-### Frontend
-
-```bash
-npm run dev            # Start Vite dev server on :5173
-npm run build          # Production build to dist/
-npm run lint           # Run oxlint
-```
+### System Endpoints
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | Health check reporting service uptime and status |
+| `GET` | `/admin/queues` | Bull Board visual queue inspector (Active / Delayed / Completed) |
+| `GET` | `/api/slack/connect` | Connect Slack workspace for rate limit alerts |
+| `DELETE` | `/api/slack/disconnect` | Disconnect Slack webhook integration |
 
 ---
 
-## 🏛 Key Engineering Decisions
+## 📁 Repository Structure
 
-See [`docs/DECISIONS.md`](docs/DECISIONS.md) for the full decision log. Summary:
-
-1. **BullMQ + Redis AOF** — all scheduling is persistent, no `setTimeout` or cron
-2. **Multi-layer idempotency** — `jobId = emailId` + atomic DB claim + deterministic `Message-ID`
-3. **Atomic Lua rate limiting** — zero race conditions across distributed workers
-4. **Startup reconciliation** — re-queues orphaned jobs on every boot
-5. **ES graceful fallback** — Elasticsearch unavailability never blocks email delivery
-6. **Windows-portable infra** — embedded-postgres + portable Redis, no Docker required
-
----
-
-## 📦 Tech Stack
-
-| Layer | Technology |
-|---|---|
-| **API** | Express 4, TypeScript, Zod validation |
-| **ORM** | Prisma 5 + PostgreSQL 16 |
-| **Queue** | BullMQ 5 + Redis 7 (AOF persistence) |
-| **Search** | Elasticsearch 8 (optional, graceful fallback) |
-| **Email** | Nodemailer + Ethereal SMTP |
-| **Auth** | JWT (httpOnly cookies) + Google OAuth |
-| **Alerts** | Slack OAuth + Incoming Webhooks |
-| **Frontend** | React 19, Vite 8, Tailwind CSS v4 |
-| **Queue UI** | Bull Board (`/admin/queues`) |
+```
+reachinbox-scheduler/
+├── backend/                     # Express REST API + BullMQ Worker
+│   ├── prisma/                  # PostgreSQL schema definition
+│   │   └── schema.prisma
+│   └── src/
+│       ├── config/              # Prisma, Redis, logger, env validation
+│       ├── middleware/          # JWT authentication, error handling
+│       ├── modules/
+│       │   ├── auth/            # Google OAuth + Dev Login controllers
+│       │   ├── emails/          # Email scheduling & listing routes
+│       │   ├── search/          # Elasticsearch client & search fallback
+│       │   ├── senders/         # Ethereal SMTP account bootstrap
+│       │   └── slack/           # Slack OAuth & webhook alerts
+│       ├── queue/
+│       │   ├── scripts/         # Atomic Lua script (reserveSlot.lua)
+│       │   ├── email.queue.ts   # BullMQ persistent queue instance
+│       │   ├── email.worker.ts  # Worker processor & atomic DB claim
+│       │   ├── rateLimiter.ts   # Lua wrapper & rolling window logic
+│       │   └── reconcile.ts     # Startup crash recovery logic
+│       ├── server.ts            # HTTP API server & static fallback
+│       ├── worker.ts            # Standalone worker bootstrap
+│       └── app.ts               # Unified production entrypoint
+│
+├── frontend/                    # React 19 + Vite 8 Dashboard
+│   └── src/
+│       ├── api/                 # Fetch API wrappers (client, auth, emails)
+│       ├── components/          # EmailsTable, ScheduleModal, StatusBadge
+│       ├── context/             # AuthContext (session state)
+│       ├── pages/               # LoginPage, DashboardPage
+│       └── types.ts             # Shared TypeScript models
+│
+├── render.yaml                  # Render Infrastructure as Code (Blueprint)
+├── docker-compose.yml           # PostgreSQL + Redis + ES local stack
+└── README.md                    # Project documentation
+```
 
 ---
 
 ## 📄 License
 
-MIT
+MIT © [Alfeen Afsal](https://github.com/alfeenafsal11)
