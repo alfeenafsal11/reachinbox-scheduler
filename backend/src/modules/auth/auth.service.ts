@@ -70,8 +70,8 @@ export class AuthService {
   async devLogin(email: string = 'demo@reachinbox.local', name: string = 'Demo User'): Promise<{ token: string; user: { id: string; email: string; name: string } }> {
     const googleId = `dev-google-${email}`;
     const user = await prisma.user.upsert({
-      where: { googleId },
-      update: { email, name },
+      where: { email },
+      update: { name, googleId },
       create: {
         googleId,
         email,
