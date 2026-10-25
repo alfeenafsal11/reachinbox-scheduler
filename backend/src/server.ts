@@ -48,6 +48,22 @@ app.use(
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 
+// Root API info endpoint
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'ReachInbox Email Job Scheduler API',
+    status: 'online',
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      queues: '/admin/queues',
+      auth: '/auth/me',
+      emails: '/api/emails/scheduled',
+    },
+    dashboard: 'https://alfeenafsal-reachinbox-scheduler-ui.static.hf.space',
+  });
+});
+
 // Health check endpoint
 app.get('/health', (_req, res) => {
   res.json({

@@ -28,4 +28,4 @@ services:
     staticPublishPath: ./dist
     envVars:
       - key: VITE_BACKEND_URL
-        sync: false
+        value: https://reachinbox-api-cu2i.onrender.com
